@@ -55,7 +55,7 @@ class Linter
     cmd_list = cmd.split(' ').concat [filePath]
 
     if @executablePath
-      cmd_list[0] = @executablePath + path.sep + cmd_list[0]
+      cmd_list[0] = "#{@executablePath}/#{cmd_list[0]}"
 
     # if there are "@filename" placeholders, replace them with real file path
     cmd_list = cmd_list.map (cmd_item) ->
@@ -127,7 +127,10 @@ class Linter
     messages = []
     regex = XRegExp @regex, @regexFlags
     XRegExp.forEach message, regex, (match, i) =>
-      messages.push(@createMessage(match))
+      try
+        messages.push(@createMessage(match))
+      catch error
+        console.log error
     , this
     callback messages
 
@@ -151,29 +154,31 @@ class Linter
     else
       level = @defaultLevel
 
-    return {
+    try
+      range = @computeRange match
+    catch error
+      console.log error
+      range = new Range(
+        [0, 0],
+        [0, 0]
+      )
+
+    line =
       line: match.line,
       col: match.col,
       level: level,
-      message: @formatMessage(match),
+      message: match.message,
       linter: @linterName,
-      range: @computeRange match
-    }
+      range: range
 
-  # Public: This is the method to override if you want to set a custom message
-  #         not only the match.message but maybe concatenate an error|warning code
-  #
-  # By default it returns the message field.
-  formatMessage: (match) ->
-    match.message
+    console.log line
+    line
 
   lineLengthForRow: (row) ->
     return @editor.lineLengthForBufferRow row
 
   getEditorScopesForPosition: (position) ->
-    # Easy fix when line is removed before it can get lighted
-    try
-      @editor.displayBuffer.tokenizedBuffer.scopesForPosition position
+    return @editor.displayBuffer.tokenizedBuffer.scopesForPosition(position)
 
   getGetRangeForScopeAtPosition: (innerMostScope, position) ->
     return @editor
